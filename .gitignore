@@ -1,0 +1,4 @@
+outputs/
+*.zip
+*.pyc
+volumetric_data/

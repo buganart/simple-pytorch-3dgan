@@ -1,0 +1,5 @@
+tensorboardX>=1.6
+torch>=1.6.0
+tqdm>=4.48.0
+trimesh>=3.7.14
+wandb>=0.10.2

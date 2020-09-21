@@ -1,5 +1,19 @@
 # A Simple 3D-GAN Implementation using PyTorch
 
+Note the code is a bit messy at the moment. Only resolution 32^3 is supported
+and to change parameters `src/params.py` needs to be edited.
+
+At the moment loading the .obj files is not cached and can be slow if not enough
+workers are available.
+
+## How to run?
+
+```
+pip install -r requirements.txt
+cd src
+python main.py --logs=logs --model_name=my-tree-gan-etc --data_dir /path/to/obj/folder
+```
+
 <!-- [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/meetshah1995/tf-3dgan/blob/master/LICENSE)
 [![arXiv Tag](https://img.shields.io/badge/arXiv-1610.07584-brightgreen.svg)](https://arxiv.org/abs/1610.07584)
  -->
