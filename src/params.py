@@ -7,8 +7,8 @@ Managers of all hyper-parameters
 
 import torch
 
-epochs = 50
-batch_size = 32
+# epochs = 50
+batch_size = 16
 soft_label = True
 adv_weight = 0
 d_thresh = 0.8
@@ -32,7 +32,7 @@ def print_params():
     l = 16
     print(l * "*" + "hyper-parameters" + l * "*")
 
-    print("epochs =", epochs)
+    # print("epochs =", epochs)
     print("batch_size =", batch_size)
     print("soft_labels =", soft_label)
     print("adv_weight =", adv_weight)

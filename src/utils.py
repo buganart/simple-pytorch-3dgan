@@ -28,28 +28,31 @@ import pickle
 
 import trimesh
 import numpy as np
+import tqdm
 
-# from joblib import Memory
-# memory = Memory("../.joblib.cache", verbose=0)
+from joblib import delayed, Memory, Parallel
+
+memory = Memory("/tmp/.joblib.cache", verbose=0)
+np.random.seed(123)
 
 
-def mesh2arrayCentered(mesh, voxel_size=1, array_length=32):
+def mesh2arrayCentered(mesh, array_length=32, voxel_size=1):
     # given array length 64, voxel size 2, then output array size is [128,128,128]
-    array_size = np.ceil(
+    resolution = np.ceil(
         np.array([array_length, array_length, array_length]) / voxel_size
     ).astype(int)
     vox_array = np.zeros(
-        array_size, dtype=bool
+        resolution, dtype=bool
     )  # tanh: voxel representation [-1,1], sigmoid: [0,1]
     # scale mesh extent to fit array_length
     max_length = np.max(np.array(mesh.extents))
     mesh = mesh.apply_transform(
-        trimesh.transformations.scale_matrix((array_length - 1) / max_length)
+        trimesh.transformations.scale_matrix((array_length - 1.5) / max_length)
     )  # now the extent is [array_length**3]
     v = mesh.voxelized(voxel_size)  # max voxel array length = array_length / voxel_size
 
     # find indices in the v.matrix to center it in vox_array
-    indices = ((array_size - v.matrix.shape) / 2).astype(int)
+    indices = ((resolution - v.matrix.shape) / 2).astype(int)
     vox_array[
         indices[0] : indices[0] + v.matrix.shape[0],
         indices[1] : indices[1] + v.matrix.shape[1],
@@ -77,12 +80,45 @@ def getVoxelFromMat(path, cube_len=64):
     return voxels
 
 
-# @memory.cache()
-def voxel_from_obj_file(path):
-    mesh = trimesh.load(path, force="mesh")
-    voxels = mesh2arrayCentered(mesh)
+@memory.cache()
+def load_mesh(path):
+    return trimesh.load(path, force="mesh")
+
+
+def random_rotate(mesh):
+    mesh = mesh.copy()
+    angle_rad = np.random.rand() * 2 * np.pi
+    direction = trimesh.unitize(np.random.rand(3))
+    rot = trimesh.transformations.rotation_matrix(angle_rad, direction, [0, 0, 0])
+    return mesh.apply_transform(rot)
+
+
+def voxel_from_obj_file(path, rotate=True):
+    mesh = load_mesh(path)
+
+    if rotate:
+        # 2 random rotations
+        mesh_rot = random_rotate(mesh)
+        mesh_rot = random_rotate(mesh_rot)
+        try:
+            voxels = mesh2arrayCentered(mesh_rot)
+        except ValueError:
+            # use the original mesh
+            voxels = mesh2arrayCentered(mesh)
+    else:
+        voxels = mesh2arrayCentered(mesh)
+
     volume = np.asarray(voxels, dtype=np.float32)
     return torch.FloatTensor(volume)
+
+
+@memory.cache()
+def check(path):
+    try:
+        voxel_from_obj_file(path, rotate=False)
+        return True
+    except Exception:
+        return False
 
 
 def getVFByMarchingCubes(voxels, threshold=0.5):
@@ -113,27 +149,64 @@ def SavePloat_Voxels(voxels, path, iteration):
     plt.close()
 
 
-class ShapeNetDataset(data.Dataset):
+class AugmentDataset(data.Dataset):
     def __init__(self, root, args, train_or_val="train"):
 
         self.root = root
-        self.listdir = list(Path(root).rglob("*.obj"))
-        # print (self.listdir)
-        # print (len(self.listdir)) # 10668
+        paths = [
+            p for p in Path(root).rglob("*.*") if p.suffix.lower() in [".obj", ".ply"]
+        ]
 
-        data_size = len(self.listdir)
-        #        self.listdir = self.listdir[0:int(data_size*0.7)]
-        self.listdir = self.listdir[0 : int(data_size)]
+        loadable = Parallel(verbose=2, n_jobs=-1)(
+            delayed(check)(path) for path in paths
+        )
 
-        print("data_size =", len(self.listdir))  # train: 10668-1000=9668
+        self.listdir = [p for p, is_loadable in zip(paths, loadable) if is_loadable]
+
+        print(f"Using {len(self.listdir)} of {len(paths)} files.")
+
         self.args = args
 
     def __getitem__(self, index):
         fname = self.listdir[index]
-        return voxel_from_obj_file(fname)
+        return voxel_from_obj_file(fname, rotate=True)
 
     def __len__(self):
         return len(self.listdir)
+
+
+class ShapeNetDataset(data.Dataset):
+    def __init__(self, root, args, train_or_val="train"):
+
+        self.root = root
+        paths = [
+            p for p in Path(root).rglob("*.*") if p.suffix.lower() in [".obj", ".ply"]
+        ]
+
+        # loadable = Parallel(verbose=2, n_jobs=-1)(
+        #     delayed(check)(path) for path in paths
+
+        # self.listdir = [p for p, is_loadable in zip(paths, loadable) if is_loadable]
+
+        self.voxels = Parallel(verbose=2, n_jobs=-1)(
+            delayed(voxel_from_obj_file)(path, rotate=False) for path in paths
+        )
+        # print (self.listdir)
+        # print(f"Using {len(self.listdir)} of {len(paths)} files.")
+
+        # data_size = len(self.listdir)
+        #        self.listdir = self.listdir[0:int(data_size*0.7)]
+
+        self.args = args
+
+    def __getitem__(self, index):
+        return self.voxels[index]
+        # fname = self.listdir[index]
+        # return voxel_from_obj_file(fname, rotate=args.rotate)
+
+    def __len__(self):
+        # return len(self.listdir)
+        return len(self.voxels)
 
 
 def generateZ(args, batch):

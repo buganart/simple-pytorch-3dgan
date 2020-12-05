@@ -51,10 +51,16 @@ def save_val_log(writer, loss_D, loss_G, itr):
         writer.add_scalar(tag, value, itr)
 
 
+def render(voxelmesh, path):
+    scene = voxelmesh.scene()
+    png = scene.save_image(resolution=[600, 600])
+    with open(path, "wb") as f:
+        f.write(png)
+
+
 def trainer(args):
 
     config_keys = [
-        "epochs",
         "batch_size",
         "soft_label",
         "adv_weight",
@@ -70,7 +76,10 @@ def trainer(args):
         "bias",
     ]
 
-    config = {**args.__dict__, **{k: getattr(params, k) for k in config_keys}}
+    config = {
+        **args.__dict__,
+        **{k: getattr(params, k) for k in config_keys},
+    }
     pprint.pprint(config)
 
     wandb.init(
@@ -105,11 +114,18 @@ def trainer(args):
 
     print(dsets_path)  # ../volumetric_data/chair/30/train/
 
-    train_dsets = ShapeNetDataset(dsets_path, args, "train")
+    if args.rotate:
+        train_dsets = AugmentDataset(dsets_path, args, "train")
+    else:
+        train_dsets = ShapeNetDataset(dsets_path, args, "train")
     # val_dsets = ShapeNetDataset(dsets_path, args, "val")
 
     train_dset_loaders = torch.utils.data.DataLoader(
-        train_dsets, batch_size=params.batch_size, shuffle=True, num_workers=16
+        train_dsets,
+        batch_size=params.batch_size,
+        shuffle=True,
+        num_workers=24,
+        pin_memory=True,
     )
     # val_dset_loaders = torch.utils.data.DataLoader(val_dsets, batch_size=args.batch_size, shuffle=True, num_workers=1)
 
@@ -150,7 +166,7 @@ def trainer(args):
     itr_val = -1
     itr_train = -1
 
-    for epoch in range(params.epochs):
+    for epoch in range(args.epochs):
 
         start = time.time()
 
@@ -191,7 +207,7 @@ def trainer(args):
 
                 fake = G(Z)
 
-                if i == 0:
+                if i == 0 and epoch % args.generate_every == 0:
                     image_saved_path = Path(params.images_dir) / args.model_name
                     image_saved_path.mkdir(parents=True, exist_ok=True)
 
@@ -200,9 +216,13 @@ def trainer(args):
                     fnames = []
                     for i, samp in enumerate(samples):
                         # print(i, samp)
-                        mesh = trimesh.voxel.VoxelGrid(
-                            trimesh.voxel.encoding.DenseEncoding(samp >= 0.5)
-                        ).marching_cubes
+                        try:
+                            mesh = trimesh.voxel.VoxelGrid(
+                                trimesh.voxel.encoding.DenseEncoding(samp >= 0.5)
+                            ).marching_cubes
+                        except ValueError as exc:
+                            print(f"Marching cubes failed: {exc}")
+                            continue
                         fname = Path(image_saved_path) / f"{epoch:04}_{i}.obj"
                         mesh.export(fname)
                         fnames.append(fname)

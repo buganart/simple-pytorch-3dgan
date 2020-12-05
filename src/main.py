@@ -27,6 +27,9 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--data_dir", type=str, required=True)
+    parser.add_argument("--generate_every", type=int, default=1)
+    parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--rotate", action="store_true")
 
     # loggings parameters
     parser.add_argument("--logs", type=str, default=None, help="logs by tensorboardX")

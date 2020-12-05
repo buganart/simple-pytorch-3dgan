@@ -40,7 +40,10 @@ class net_G(torch.nn.Module):
         layer = torch.nn.Sequential(
             torch.nn.ConvTranspose3d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, bias=bias, padding=padding),
             torch.nn.BatchNorm3d(output_dim),
-            torch.nn.ReLU(True)
+            torch.nn.ReLU(True),
+            # torch.nn.ConvTranspose3d(output_dim, output_dim, kernel_size=3, stride=1, bias=bias, padding=(1, 1, 1)),
+            # torch.nn.BatchNorm3d(output_dim),
+            # torch.nn.ReLU(True),
             # torch.nn.LeakyReLU(self.leak_value, True)
         )
         return layer
