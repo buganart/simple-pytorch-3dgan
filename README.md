@@ -3,8 +3,8 @@
 Note the code is a bit messy at the moment. Only resolution 32^3 is supported
 and to change parameters `src/params.py` needs to be edited.
 
-At the moment loading the .obj files is not cached and can be slow if not enough
-workers are available.
+The voxelization is cached with `joblib` if augmentation is disabled. The initial run
+takes a while to voxelize all the 3D models.
 
 ## Training
 
@@ -12,6 +12,8 @@ workers are available.
 pip install -r requirements.txt
 python main.py --logs=logs --model_name=my-gan --data_dir /path/to/3D-models/folder --epochs 100 --generate_every 1
 ```
+
+Add the `--rotate` flag for random axis rotation. Note: this is CPU intensive and very slow on google colab.
 
 <!-- [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/meetshah1995/tf-3dgan/blob/master/LICENSE)
 [![arXiv Tag](https://img.shields.io/badge/arXiv-1610.07584-brightgreen.svg)](https://arxiv.org/abs/1610.07584)
