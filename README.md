@@ -6,12 +6,11 @@ and to change parameters `src/params.py` needs to be edited.
 At the moment loading the .obj files is not cached and can be slow if not enough
 workers are available.
 
-## How to run?
+## Training
 
 ```
 pip install -r requirements.txt
-cd src
-python main.py --logs=logs --model_name=my-tree-gan-etc --data_dir /path/to/obj/folder
+python main.py --logs=logs --model_name=my-gan --data_dir /path/to/3D-models/folder --epochs 100 --generate_every 1
 ```
 
 <!-- [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/meetshah1995/tf-3dgan/blob/master/LICENSE)

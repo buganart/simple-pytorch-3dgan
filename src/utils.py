@@ -9,7 +9,7 @@ import functools
 import scipy.ndimage as nd
 import scipy.io as io
 import matplotlib
-import params
+from . import params
 from pathlib import Path
 
 if params.device.type != "cpu":
@@ -113,9 +113,13 @@ def voxel_from_obj_file(path, rotate=True):
 
 
 @memory.cache()
+def load_deterministic(path):
+    return voxel_from_obj_file(path, rotate=False)
+
+
 def check(path):
     try:
-        voxel_from_obj_file(path, rotate=False)
+        load_deterministic(path)
         return True
     except Exception:
         return False
@@ -183,13 +187,16 @@ class ShapeNetDataset(data.Dataset):
             p for p in Path(root).rglob("*.*") if p.suffix.lower() in [".obj", ".ply"]
         ]
 
-        # loadable = Parallel(verbose=2, n_jobs=-1)(
-        #     delayed(check)(path) for path in paths
+        loadable = Parallel(verbose=2, n_jobs=-1)(
+            delayed(check)(path) for path in paths
+        )
+
+        loadable_paths = [path for path, can_load in zip(paths, loadable) if can_load]
 
         # self.listdir = [p for p, is_loadable in zip(paths, loadable) if is_loadable]
 
         self.voxels = Parallel(verbose=2, n_jobs=-1)(
-            delayed(voxel_from_obj_file)(path, rotate=False) for path in paths
+            delayed(load_deterministic)(path) for path in loadable_paths
         )
         # print (self.listdir)
         # print(f"Using {len(self.listdir)} of {len(paths)} files.")

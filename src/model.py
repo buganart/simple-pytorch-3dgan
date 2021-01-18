@@ -1,5 +1,6 @@
 import torch
-import params
+
+from . import params
 
 '''
 

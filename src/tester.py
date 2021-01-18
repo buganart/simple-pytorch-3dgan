@@ -9,9 +9,9 @@ import torch
 from torch import optim
 from torch import nn
 from collections import OrderedDict
-from utils import *
+from .utils import *
 import os
-from model import net_G, net_D
+from .model import net_G, net_D
 # from lr_sh import  MultiStepLR
 
 # added
@@ -19,7 +19,7 @@ import datetime
 from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
 import numpy as np
-import params
+from .import params
 import visdom
 
 # def test_gen(args):
