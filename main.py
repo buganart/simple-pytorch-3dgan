@@ -11,6 +11,10 @@ import torch
 from src.tester import tester
 from src import params
 
+import os
+
+# os.environ["WANDB_MODE"] = "dryrun"
+
 
 def str2bool(v):
     if v.lower() in ("yes", "true", "t", "y", "1"):
@@ -29,6 +33,7 @@ def main():
     parser.add_argument("--data_dir", type=str, required=True)
     parser.add_argument("--generate_every", type=int, default=1)
     parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--res", type=int, default=32)
     parser.add_argument("--rotate", action="store_true")
 
     # loggings parameters

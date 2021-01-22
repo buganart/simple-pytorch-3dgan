@@ -93,7 +93,7 @@ def random_rotate(mesh):
     return mesh.apply_transform(rot)
 
 
-def voxel_from_obj_file(path, rotate=True):
+def voxel_from_obj_file(path, rotate=True, res=32):
     mesh = load_mesh(path)
 
     if rotate:
@@ -101,20 +101,20 @@ def voxel_from_obj_file(path, rotate=True):
         mesh_rot = random_rotate(mesh)
         mesh_rot = random_rotate(mesh_rot)
         try:
-            voxels = mesh2arrayCentered(mesh_rot)
+            voxels = mesh2arrayCentered(mesh_rot, array_length=res)
         except ValueError:
             # use the original mesh
-            voxels = mesh2arrayCentered(mesh)
+            voxels = mesh2arrayCentered(mesh, array_length=res)
     else:
-        voxels = mesh2arrayCentered(mesh)
+        voxels = mesh2arrayCentered(mesh, array_length=res)
 
     volume = np.asarray(voxels, dtype=np.float32)
     return torch.FloatTensor(volume)
 
 
 @memory.cache()
-def load_deterministic(path):
-    return voxel_from_obj_file(path, rotate=False)
+def load_deterministic(path, res=32):
+    return voxel_from_obj_file(path, rotate=False, res=res)
 
 
 def check(path):
@@ -154,7 +154,7 @@ def SavePloat_Voxels(voxels, path, iteration):
 
 
 class AugmentDataset(data.Dataset):
-    def __init__(self, root, args, train_or_val="train"):
+    def __init__(self, root, args, train_or_val="train", res=32):
 
         self.root = root
         paths = [
@@ -170,17 +170,18 @@ class AugmentDataset(data.Dataset):
         print(f"Using {len(self.listdir)} of {len(paths)} files.")
 
         self.args = args
+        self.res = res
 
     def __getitem__(self, index):
         fname = self.listdir[index]
-        return voxel_from_obj_file(fname, rotate=True)
+        return voxel_from_obj_file(fname, rotate=True, res=self.res)
 
     def __len__(self):
         return len(self.listdir)
 
 
 class ShapeNetDataset(data.Dataset):
-    def __init__(self, root, args, train_or_val="train"):
+    def __init__(self, root, args, train_or_val="train", res=32):
 
         self.root = root
         paths = [
@@ -196,7 +197,7 @@ class ShapeNetDataset(data.Dataset):
         # self.listdir = [p for p, is_loadable in zip(paths, loadable) if is_loadable]
 
         self.voxels = Parallel(verbose=2, n_jobs=-1)(
-            delayed(load_deterministic)(path) for path in loadable_paths
+            delayed(load_deterministic)(path, res) for path in loadable_paths
         )
         # print (self.listdir)
         # print(f"Using {len(self.listdir)} of {len(paths)} files.")
@@ -205,6 +206,7 @@ class ShapeNetDataset(data.Dataset):
         #        self.listdir = self.listdir[0:int(data_size*0.7)]
 
         self.args = args
+        self.res = res
 
     def __getitem__(self, index):
         return self.voxels[index]

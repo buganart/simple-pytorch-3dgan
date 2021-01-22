@@ -83,7 +83,9 @@ def trainer(args):
     pprint.pprint(config)
 
     wandb.init(
-        entity="bugan", project="simple-pytorch-3dgan", config=config,
+        entity="bugan",
+        project="simple-pytorch-3dgan",
+        config=config,
     )
 
     # added for output dir
@@ -115,9 +117,9 @@ def trainer(args):
     print(dsets_path)  # ../volumetric_data/chair/30/train/
 
     if args.rotate:
-        train_dsets = AugmentDataset(dsets_path, args, "train")
+        train_dsets = AugmentDataset(dsets_path, args, "train", res=args.res)
     else:
-        train_dsets = ShapeNetDataset(dsets_path, args, "train")
+        train_dsets = ShapeNetDataset(dsets_path, args, "train", res=args.res)
     # val_dsets = ShapeNetDataset(dsets_path, args, "val")
 
     train_dset_loaders = torch.utils.data.DataLoader(
