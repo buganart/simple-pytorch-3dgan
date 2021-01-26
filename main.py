@@ -30,6 +30,8 @@ def main():
     # add arguments
     parser = argparse.ArgumentParser()
 
+    parser.add_argument("--resume_id", type=str, default="")
+
     parser.add_argument("--data_dir", type=str, required=True)
     parser.add_argument("--generate_every", type=int, default=1)
     parser.add_argument("--epochs", type=int, default=50)

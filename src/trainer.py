@@ -25,6 +25,7 @@ from . import params
 from tqdm import tqdm
 
 import wandb
+from argparse import Namespace
 
 
 def save_train_log(writer, loss_D, loss_G, itr):
@@ -76,50 +77,65 @@ def trainer(args):
         "bias",
     ]
 
-    config = {
-        **args.__dict__,
-        **{k: getattr(params, k) for k in config_keys},
-    }
-    pprint.pprint(config)
+    # check new run or resume run
+    if args.resume_id:
+        api = wandb.Api()
+        previous_run = api.run(f"bugan/simple-pytorch-3dgan/{args.resume_id}")
+        config = previous_run.config
+        pprint.pprint(config)
 
-    wandb.init(
-        entity="bugan",
-        project="simple-pytorch-3dgan",
-        config=config,
-    )
+        run = wandb.init(
+            project="simple-pytorch-3dgan",
+            id=args.resume_id,
+            entity="bugan",
+            config=config,
+            resume=True,
+        )
+    else:
+        config = {
+            **args.__dict__,
+            **{k: getattr(params, k) for k in config_keys},
+        }
+        pprint.pprint(config)
 
+        run = wandb.init(
+            entity="bugan", project="simple-pytorch-3dgan", config=config, resume=True
+        )
+
+    # convert config dict to Namespace
+    config = Namespace(**config)
     # added for output dir
-    save_file_path = params.output_dir + "/" + args.model_name
+    save_file_path = params.output_dir + "/" + config.model_name
     print(save_file_path)  # ../outputs/dcgan
     if not os.path.exists(save_file_path):
         os.makedirs(save_file_path)
 
     # for using tensorboard
-    if args.logs:
+    if config.logs:
         model_uid = datetime.datetime.now().strftime("%d-%m-%Y-%H-%M-%S")
         writer = SummaryWriter(
             params.output_dir
             + "/"
-            + args.model_name
+            + config.model_name
             + "/logs_"
             + model_uid
             + "_"
-            + args.logs
+            + config.logs
             + "/"
         )
 
     # datset define
     # dsets_path = args.input_dir + args.data_dir + "train/"
-    dsets_path = args.data_dir
+    dsets_path = config.data_dir
     # if params.cube_len == 64:
     #     dsets_path = params.data_dir + params.model_dir + "30/train64/"
 
     print(dsets_path)  # ../volumetric_data/chair/30/train/
 
-    if args.rotate:
-        train_dsets = AugmentDataset(dsets_path, args, "train", res=args.res)
+    if config.rotate:
+        train_dsets = AugmentDataset(dsets_path, config, "train", res=config.res)
     else:
-        train_dsets = ShapeNetDataset(dsets_path, args, "train", res=args.res)
+        train_dsets = ShapeNetDataset(dsets_path, config, "train", res=config.res)
     # val_dsets = ShapeNetDataset(dsets_path, args, "val")
 
     train_dset_loaders = torch.utils.data.DataLoader(
@@ -136,12 +152,16 @@ def trainer(args):
     # print (dset_len["train"])
 
     # model define
-    D = net_D(args)
+    D = net_D(config)
     # summary(net_D, input_size=(32, 32, 32))
 
-    G = net_G(args)
+    G = net_G(config)
     # print(G)
     # print(D)
+
+    # load state dict if resume
+    if args.resume_id:
+        G, D = load_model(run, G, D)
 
     wandb.watch(G)
     wandb.watch(D)
@@ -168,7 +188,7 @@ def trainer(args):
     itr_val = -1
     itr_train = -1
 
-    for epoch in range(args.epochs):
+    for epoch in range(config.epochs):
 
         start = time.time()
 
@@ -201,7 +221,7 @@ def trainer(args):
                 batch = X.size()[0]
                 # print (batch)
 
-                Z = generateZ(args, batch)
+                Z = generateZ(config, batch)
                 # print (Z.size())
 
                 # ============= Train the discriminator =============#
@@ -209,8 +229,8 @@ def trainer(args):
 
                 fake = G(Z)
 
-                if i == 0 and epoch % args.generate_every == 0:
-                    image_saved_path = Path(params.images_dir) / args.model_name
+                if i == 0 and epoch % config.generate_every == 0:
+                    image_saved_path = Path(params.images_dir) / config.model_name
                     image_saved_path.mkdir(parents=True, exist_ok=True)
 
                     samples = fake.cpu().data[:5].squeeze().numpy()
@@ -270,7 +290,7 @@ def trainer(args):
 
                 # =============== Train the generator ===============#
 
-                Z = generateZ(args, batch)
+                Z = generateZ(config, batch)
 
                 # print (X)
                 fake = G(Z)  # generated fake: 0-1, X: 0/1
@@ -284,7 +304,7 @@ def trainer(args):
                 # g_loss = recon_g_loss + params.adv_weight * adv_g_loss
                 g_loss = adv_g_loss
 
-                if args.local_test:
+                if config.local_test:
                     # print('Iteration-{} , D(x) : {:.4} , G(x) : {:.4} , D(G(x)) : {:.4}'.format(itr_train, d_loss.item(), recon_g_loss.item(), adv_g_loss.item()))
                     print(
                         "Iteration-{} , D(x) : {:.4}, D(G(x)) : {:.4}".format(
@@ -303,7 +323,7 @@ def trainer(args):
                 running_loss_D += d_loss.item() * X.size(0)
                 running_loss_adv_G += adv_g_loss.item() * X.size(0)
 
-                if args.logs:
+                if config.logs:
                     loss_G = {
                         "adv_loss_G": adv_g_loss,
                         "recon_loss_G": recon_g_loss,
@@ -345,13 +365,6 @@ def trainer(args):
             if (epoch + 1) % params.model_save_step == 0:
 
                 print("model_saved, images_saved...")
-                torch.save(
-                    G.state_dict(),
-                    params.output_dir + "/" + args.model_name + "/" + "G" + ".pth",
-                )
-                torch.save(
-                    D.state_dict(),
-                    params.output_dir + "/" + args.model_name + "/" + "D" + ".pth",
-                )
+                save_model(run, config.model_name, G, D)
 
                 # SavePloat_Voxels(samples, image_saved_path, epoch)

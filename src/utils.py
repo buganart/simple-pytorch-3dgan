@@ -29,6 +29,7 @@ import pickle
 import trimesh
 import numpy as np
 import tqdm
+import wandb
 
 from joblib import delayed, Memory, Parallel
 
@@ -228,3 +229,44 @@ def generateZ(args, batch):
         print("z_dist is not normal or uniform")
 
     return Z
+
+
+def save_model(run, model_name, G, D):
+    path_G = params.output_dir + "/" + model_name + "/G.pth"
+    path_D = params.output_dir + "/" + model_name + "/D.pth"
+    torch.save(
+        G.state_dict(),
+        path_G,
+    )
+    torch.save(
+        D.state_dict(),
+        path_D,
+    )
+
+    # save also in wandb
+    path_G = str(Path(run.dir).absolute() / "G.pth")
+    path_D = str(Path(run.dir).absolute() / "D.pth")
+    torch.save(
+        G.state_dict(),
+        path_G,
+    )
+    torch.save(
+        D.state_dict(),
+        path_D,
+    )
+    wandb.save(path_G)
+    wandb.save(path_D)
+
+
+def load_model(run, G, D):
+    file_G = wandb.restore("G.pth").name
+    file_D = wandb.restore("D.pth").name
+
+    if not torch.cuda.is_available():
+        G.load_state_dict(torch.load(file_G, map_location={"cuda:0": "cpu"}))
+        D.load_state_dict(torch.load(file_D, map_location={"cuda:0": "cpu"}))
+    else:
+        G.load_state_dict(torch.load(file_G))
+        D.load_state_dict(torch.load(file_D))
+
+    return G, D

@@ -46,27 +46,43 @@ def tester(args):
     if args.use_visdom == True:
         vis = visdom.Visdom()
 
-    save_file_path = params.output_dir + "/" + args.model_name
-    pretrained_file_path_G = save_file_path + "/" + "G.pth"
-    pretrained_file_path_D = save_file_path + "/" + "D.pth"
+    if args.resume_id:
+        api = wandb.Api()
+        previous_run = api.run(f"bugan/simple-pytorch-3dgan/{args.resume_id}")
+        config = previous_run.config
 
-    print(pretrained_file_path_G)
-
-    D = net_D(args)
-    G = net_G(args)
-
-    if not torch.cuda.is_available():
-        G.load_state_dict(
-            torch.load(pretrained_file_path_G, map_location={"cuda:0": "cpu"})
+        run = wandb.init(
+            project="simple-pytorch-3dgan",
+            id=args.resume_id,
+            entity="bugan",
+            resume=True,
         )
-        D.load_state_dict(
-            torch.load(pretrained_file_path_D, map_location={"cuda:0": "cpu"})
-        )
+        G = net_G(config)
+        D = net_D(config)
+
+        G, D = load_model(run, G, D)
     else:
-        G.load_state_dict(torch.load(pretrained_file_path_G))
-        D.load_state_dict(
-            torch.load(pretrained_file_path_D, map_location={"cuda:0": "cpu"})
-        )
+        G = net_G(args)
+        D = net_D(args)
+
+        save_file_path = params.output_dir + "/" + args.model_name
+        pretrained_file_path_G = save_file_path + "/" + "G.pth"
+        pretrained_file_path_D = save_file_path + "/" + "D.pth"
+
+        print(pretrained_file_path_G)
+
+        if not torch.cuda.is_available():
+            G.load_state_dict(
+                torch.load(pretrained_file_path_G, map_location={"cuda:0": "cpu"})
+            )
+            D.load_state_dict(
+                torch.load(pretrained_file_path_D, map_location={"cuda:0": "cpu"})
+            )
+        else:
+            G.load_state_dict(torch.load(pretrained_file_path_G))
+            D.load_state_dict(
+                torch.load(pretrained_file_path_D, map_location={"cuda:0": "cpu"})
+            )
 
     print("visualizing model")
 
